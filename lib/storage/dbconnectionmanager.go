@@ -62,7 +62,7 @@ func (d DbConnectionManager) connect(connectionString string) (*sql.DB, error) {
 	return dc, nil
 }
 
-func (c DbConnectionManager) GetConnection(ctx context.Context, key DbConnectionStringKey, out chan DbConnectionManagerResponse) {
+func (c DbConnectionManager) Connect(ctx context.Context, key DbConnectionStringKey, out chan DbConnectionManagerResponse) {
 	awsSecretManagerResponseChannel := make(chan AwsSecretsManagerResponse)
 	go c.awsSecretsManager.GetValueString(ctx, key.String(), awsSecretManagerResponseChannel)
 
