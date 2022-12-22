@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/swethabhageerath/storage/internal/storage/aws/secrets"
@@ -22,30 +24,46 @@ type AwsSecretsManagerResponse struct {
 	Error error
 }
 
+func (a AwsSecretsManager) getConnectionStringRedisExpirationTime() (int64, error) {
+	expirationAsString := os.Getenv("REDIS_CONNSTRING_EXPIRATION")
+	s, err := strconv.ParseInt(expirationAsString, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return s, nil
+}
+
 func (a AwsSecretsManager) GetValueString(ctx context.Context, secretName string, out chan AwsSecretsManagerResponse) {
-	var d time.Duration = 100000000000
+	t, err := a.getConnectionStringRedisExpirationTime()
+
+	if err != nil {
+		out <- AwsSecretsManagerResponse{
+			Data:  "",
+			Error: err,
+		}
+		return
+	}
+
 	i, err := a.redisManager.Get(secretName)
+
+	response := AwsSecretsManagerResponse{}
 
 	if err != nil || i == nil {
 		v, err := secrets.Secrets{}.GetValueString(ctx, secretName)
 
-		a.redisManager.Set(secretName, v, time.Duration(d.Hours()))
+		a.redisManager.Set(secretName, v, time.Duration(t))
 
 		if err != nil {
-			out <- AwsSecretsManagerResponse{
-				Data:  "",
-				Error: err,
-			}
+			response.Data = ""
+			response.Error = err
 		} else {
-			out <- AwsSecretsManagerResponse{
-				Data:  v,
-				Error: nil,
-			}
+			response.Data = v
+			response.Error = nil
 		}
 	} else {
-		out <- AwsSecretsManagerResponse{
-			Data:  i.(string),
-			Error: nil,
-		}
+		response.Data = i.(string)
+		response.Error = err
 	}
+
+	out <- response
 }
